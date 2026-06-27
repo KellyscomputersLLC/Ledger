@@ -1,0 +1,11 @@
+# Third-party runtime dependencies for Ledger (installed in CI before building).
+#
+# Verified by AST-scanning every module's imports: the ONLY third-party package
+# is `cryptography` -- used by crypto.py (Scrypt key derivation + AES-GCM) and
+# by hostnet.py (the TLS certificate, EC keys, X.509). Everything else is the
+# Python standard library + SQLite.
+#
+# `cryptography` ships prebuilt wheels for Linux, Windows, and macOS on both
+# x86-64 and arm64, so CI installs it cleanly on every build runner with no
+# compiler needed.
+cryptography>=42
