@@ -16,11 +16,36 @@ import os
 import sys
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
+# IMPORTANT: put the project root (the folder holding this spec, which is also
+# the folder that contains the `ledger/` package) on sys.path *before* calling
+# the collect_* helpers below. Those helpers resolve the package by importing
+# it in an isolated probe, and PyInstaller runs the spec with a sys.path that
+# does NOT include the project root. Without this line, `import ledger` fails
+# during the build, both helpers silently return EMPTY, and the build ships
+# with NO package data (blank Help panel, icons falling back to the drawn
+# emblem) and NO lazily-imported submodules. SPECPATH is the spec's directory,
+# injected by PyInstaller. This is verified to flow through to the isolated
+# probe, so collect_submodules/collect_data_files see the real package.
+if SPECPATH not in sys.path:
+    sys.path.insert(0, SPECPATH)
+
 # Pull in the WHOLE ledger package so any submodule that is imported lazily or
 # by name (networking, discovery, printing, ...) is never dropped, plus any
 # non-code data shipped inside the package.
 hiddenimports = collect_submodules("ledger")
 datas = collect_data_files("ledger")
+
+# Belt-and-suspenders: the app cannot start without its data files, so if the
+# collection above ever comes back empty (e.g. a future PyInstaller changes how
+# the isolated probe resolves sys.path), fail loudly at build time rather than
+# shipping a silently-broken installer. This guard turned an invisible runtime
+# bug into a visible build error.
+if not any(dest == "ledger" for _src, dest in datas):
+    raise SystemExit(
+        "ledger.spec: package data files were not collected -- the Help panel "
+        "and icons would be missing from this build. Check that the 'ledger' "
+        "package is importable from SPECPATH during the build."
+    )
 
 # crypto.py imports these THREE lazily (inside functions), so static analysis
 # could miss them. hostnet.py also imports `cryptography` at top level, which
